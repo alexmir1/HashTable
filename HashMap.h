@@ -6,11 +6,30 @@
 template<typename KeyType, typename ValueType, typename Hash = std::hash<KeyType> >
 class HashMap {
     Hash hasher;
-    size_t table_size = 95009;
+    size_t table_size = 11;
     size_t count = 0;
     std::list<std::pair<const KeyType, ValueType>>* table = nullptr;
     std::list<size_t> used_buckets;
     std::unique_ptr<std::list<size_t>::iterator>* used_buckets_iter = nullptr;
+    void resize(size_t new_size) {
+        auto new_table = new std::list<std::pair<const KeyType, ValueType>>[new_size];
+        auto new_used_buckets_iter = new std::unique_ptr<std::list<size_t>::iterator>[new_size];
+        std::list<size_t> new_used_buckets;
+        for (const auto & x : *this) {
+            size_t hash = hasher(x.first) % new_size;
+            new_table[hash].push_back(x);
+            if (!new_used_buckets_iter[hash]) {
+                new_used_buckets.push_front(hash);
+                new_used_buckets_iter[hash].reset(new std::list<size_t>::iterator(new_used_buckets.begin()));
+            }
+        }
+        swap(used_buckets, new_used_buckets);
+        swap(used_buckets_iter, new_used_buckets_iter);
+        swap(table, new_table);
+        delete[] new_table;
+        delete[] new_used_buckets_iter;
+        table_size = new_size;
+    }
 public:
     HashMap() : HashMap(Hash()) {
     }
@@ -54,6 +73,8 @@ public:
         return hasher;
     }
     void insert(const std::pair<const KeyType, ValueType>& elem) {
+        if (count == table_size)
+            resize(2 * table_size);
         if (find(elem.first) == end()) {
             ++count;
             size_t hash = hasher(elem.first) % table_size;
